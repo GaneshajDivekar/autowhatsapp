@@ -4,25 +4,44 @@ require('dotenv').config();
 
 const FASTAPI_URL = process.env.FASTAPI_URL || 'http://localhost:8000';
 
+// Find Chrome on Railway or local
+const CHROME_PATH = process.env.CHROME_PATH ||
+  '/nix/store/*/bin/chromium' ||
+  '/usr/bin/chromium-browser' ||
+  '/usr/bin/chromium' ||
+  undefined;
+
 const client = new Client({
-  authStrategy: new LocalAuth({ clientId: 'tharoor' }),
+  authStrategy: new LocalAuth({
+    clientId: 'tharoor',
+    dataPath: '/tmp/.wwebjs_auth'
+  }),
   puppeteer: {
     headless: true,
+    executablePath: CHROME_PATH,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
       '--no-zygote',
-      '--single-process'
+      '--single-process',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--disable-translate',
+      '--no-first-run',
+      '--safebrowsing-disable-auto-update'
     ]
   }
 });
 
 client.on('qr', (qr) => {
-  console.log('\n📱 Scan this QR code with WhatsApp:\n');
+  console.log('\n📱 QR CODE — scan with WhatsApp:\n');
   qrcode.generate(qr, { small: true });
-  console.log('\n⏰ Scan quickly before it expires!\n');
+  console.log('\n⚠️  Check Railway logs to see this QR code!');
+  console.log('Go to: Railway Dashboard → Your service → Logs\n');
 });
 
 client.on('loading_screen', (percent, message) => {
@@ -38,12 +57,12 @@ client.on('auth_failure', (msg) => {
 });
 
 client.on('ready', () => {
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('✅ WhatsApp Bot is LIVE!');
-  console.log('👤 Only replying to individual chats');
-  console.log('🚫 Group messages ignored');
-  console.log('🧠 Gender + Emotion detection ON');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  console.log('👤 Individual chats only');
+  console.log('🚫 Groups ignored');
+  console.log('🧠 Gender + Emotion ON');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━\n');
 });
 
 client.on('message', async (msg) => {
@@ -52,8 +71,6 @@ client.on('message', async (msg) => {
   if (!msg.body.trim()) return;
 
   const chat = await msg.getChat();
-
-  // Skip group messages
   if (chat.isGroup) {
     console.log(`⏭️  Skipping group: "${chat.name}"`);
     return;
@@ -84,18 +101,16 @@ client.on('message', async (msg) => {
       return;
     }
 
-    console.log(`👤 Gender: ${data.gender_detected}`);
+    console.log(`👤 Gender: ${data.gender_detected} | Mood: ${data.mood_detected}`);
 
-    // Human-like delay 1.5 to 3 seconds
     const delay = 1500 + Math.random() * 1500;
     await new Promise(r => setTimeout(r, delay));
 
     await msg.reply(data.reply);
-    console.log(`✉️  Sent: ${data.reply.substring(0, 70)}...`);
+    console.log(`✉️  Sent: ${data.reply.substring(0, 60)}...`);
 
   } catch (err) {
     console.error('❌ Error:', err.message);
-    console.error('💡 Make sure FastAPI is running on port 8000');
   }
 });
 
@@ -105,8 +120,8 @@ client.on('disconnected', (reason) => {
   setTimeout(() => client.initialize(), 5000);
 });
 
-console.log('🚀 Starting WhatsApp Bot...');
+console.log('🚀 Starting WhatsApp Bot on Railway...');
 console.log('📡 FastAPI URL:', FASTAPI_URL);
-console.log('⏳ Loading browser — please wait 30-60 seconds...\n');
+console.log('⏳ Loading browser — wait 60 seconds for QR...\n');
 
 client.initialize();
