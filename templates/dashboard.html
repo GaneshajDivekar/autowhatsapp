@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tharoor Bot Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: #f5f5f0; color: #1a1a18; min-height: 100vh; }
+  .topbar { background: #fff; border-bottom: 1px solid #e8e8e0;
+            padding: 0 2rem; height: 56px; display: flex; align-items: center;
+            justify-content: space-between; }
+  .logo { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+         animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .badge { font-size: 12px; padding: 3px 10px; border-radius: 20px;
+           background: #dcfce7; color: #15803d; font-weight: 500; }
+  .badge.off { background: #fee2e2; color: #b91c1c; }
+  .main { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .card { background: #fff; border-radius: 12px; border: 1px solid #e8e8e0; padding: 1.25rem; }
+  .metric-label { font-size: 12px; color: #6b6b63; margin-bottom: 6px; }
+  .metric-value { font-size: 28px; font-weight: 600; color: #1a1a18; }
+  .section-title { font-size: 13px; font-weight: 600; color: #6b6b63;
+                   text-transform: uppercase; letter-spacing: .06em; margin-bottom: 1rem; }
+  .msg-row { padding: 10px 0; border-bottom: 1px solid #f0f0ea; }
+  .msg-row:last-child { border-bottom: none; }
+  .msg-meta { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .msg-sender { font-size: 13px; font-weight: 600; color: #1a1a18; }
+  .msg-time { font-size: 11px; color: #9b9b93; }
+  .msg-in { font-size: 13px; color: #4a4a44; margin-bottom: 4px; }
+  .msg-out { font-size: 13px; color: #0f766e; font-style: italic; }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 1rem; }
+  .btn { padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 500;
+         cursor: pointer; border: 1px solid #e8e8e0; background: #fff;
+         transition: all .15s; color: #1a1a18; }
+  .btn:hover { background: #f5f5f0; }
+  .btn.green { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+  .btn.red   { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+  .btn.blue  { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media(max-width:600px){ .grid4{grid-template-columns:1fr 1fr;} .grid2{grid-template-columns:1fr;} }
+  .empty { color: #9b9b93; font-size: 13px; text-align: center; padding: 2rem 0; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px;
+         background: #f0f0ea; color: #6b6b63; margin-left: 6px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo">
+    <span>🎩</span> Tharoor Bot
+    <span id="status-badge" class="badge {{ '' if bot_enabled else 'off' }}">
+      {{ 'Active' if bot_enabled else 'Paused' }}
+    </span>
+  </div>
+  <div style="font-size:12px;color:#9b9b93" id="last-update">Live</div>
+</div>
+
+<div class="main">
+  <!-- Metrics -->
+  <div class="grid4">
+    <div class="card">
+      <div class="metric-label">Total replies</div>
+      <div class="metric-value" id="m-replies">{{ stats.total_replies }}</div>
+    </div>
+    <div class="card">
+      <div class="metric-label">Messages received</div>
+      <div class="metric-value" id="m-msgs">{{ stats.total_messages }}</div>
+    </div>
+    <div class="card">
+      <div class="metric-label">Active chats</div>
+      <div class="metric-value" id="m-chats">—</div>
+    </div>
+    <div class="card">
+      <div class="metric-label">Last reply</div>
+      <div class="metric-value" style="font-size:14px;padding-top:6px" id="m-last">—</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <!-- Recent messages -->
+    <div class="card">
+      <div class="section-title">Recent conversations</div>
+      <div id="msg-list">
+        {% if recent_messages %}
+          {% for m in recent_messages %}
+          <div class="msg-row">
+            <div class="msg-meta">
+              <span class="msg-sender">{{ m.sender }} <span class="tag">{{ m.time }}</span></span>
+            </div>
+            <div class="msg-in">↘ {{ m.message }}</div>
+            <div class="msg-out">↗ {{ m.reply }}</div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty">No messages yet</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="card">
+        <div class="section-title">Bot control</div>
+        <div class="controls">
+          <button class="btn green" onclick="control('enable')">▶ Enable bot</button>
+          <button class="btn red"   onclick="control('disable')">⏸ Pause bot</button>
+          <button class="btn blue"  onclick="control('clear')">🗑 Clear all history</button>
+        </div>
+        <div id="ctrl-msg" style="margin-top:10px;font-size:13px;color:#0f766e;min-height:20px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Webhook endpoints</div>
+        <div style="font-size:12px;color:#4a4a44;line-height:2;">
+          <div><code style="background:#f5f5f0;padding:2px 6px;border-radius:4px;">POST /webhook/enable</code></div>
+          <div><code style="background:#f5f5f0;padding:2px 6px;border-radius:4px;">POST /webhook/disable</code></div>
+          <div><code style="background:#f5f5f0;padding:2px 6px;border-radius:4px;">POST /webhook/clear-history</code></div>
+          <div><code style="background:#f5f5f0;padding:2px 6px;border-radius:4px;">POST /webhook/set-prompt</code></div>
+          <div style="margin-top:8px;color:#9b9b93;">Header: <code style="background:#f5f5f0;padding:2px 6px;border-radius:4px;">x-webhook-secret</code></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Server info</div>
+        <div style="font-size:12px;color:#4a4a44;line-height:2;">
+          <div>Started: <b>{{ stats.started_at[:19].replace('T',' ') }}</b></div>
+          <div>Platform: <b>Render.com</b></div>
+          <div>AI model: <b>Claude Sonnet</b></div>
+          <div>Style: <b>Shashi Tharoor</b> 🎩</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SECRET = prompt("Enter webhook secret to enable controls:") || "";
+
+async function control(action) {
+  const msg = document.getElementById('ctrl-msg');
+  msg.textContent = "Processing...";
+  try {
+    let url = `/webhook/${action === 'clear' ? 'clear-history' : action}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'x-webhook-secret': SECRET, 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const data = await res.json();
+    msg.textContent = res.ok ? `✓ ${JSON.stringify(data)}` : `✗ ${data.detail}`;
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+  } catch(e) { msg.textContent = `Error: ${e.message}`; }
+}
+
+// Auto-refresh stats every 10 seconds
+async function refreshStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const d = await res.json();
+    document.getElementById('m-replies').textContent = d.total_replies;
+    document.getElementById('m-msgs').textContent = d.total_messages;
+    document.getElementById('m-chats').textContent = d.active_chats;
+    document.getElementById('m-last').textContent =
+      d.last_reply_at ? d.last_reply_at.slice(11,19) : '—';
+
+    const badge = document.getElementById('status-badge');
+    badge.textContent = d.bot_enabled ? 'Active' : 'Paused';
+    badge.className = 'badge' + (d.bot_enabled ? '' : ' off');
+
+    // Refresh message list
+    if (d.recent_messages?.length) {
+      const list = document.getElementById('msg-list');
+      list.innerHTML = d.recent_messages.map(m => `
+        <div class="msg-row">
+          <div class="msg-meta">
+            <span class="msg-sender">${m.sender} <span class="tag">${m.time}</span></span>
+          </div>
+          <div class="msg-in">↘ ${m.message}</div>
+          <div class="msg-out">↗ ${m.reply}</div>
+        </div>`).join('');
+    }
+    document.getElementById('last-update').textContent =
+      'Updated ' + new Date().toLocaleTimeString();
+  } catch(e) {}
+}
+
+setInterval(refreshStats, 10000);
+</script>
+</body>
+</html>
